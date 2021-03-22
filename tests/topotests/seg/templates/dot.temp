@@ -1,0 +1,31 @@
+{% macro link_macro(src_rtr, dst_rtr, network) -%}
+  {{ src_rtr }} -- {{ dst_rtr }} [label="{{ network }}"];
+{%- endmacro -%}
+
+{% macro router_macro(rtr) -%}
+{{ rtr.name }} [
+	label="{{ rtr.name }}",
+	style=filled,
+	{% if rtr.isRouter == 1 %}
+	shape=doubleoctagon,
+	fillcolor="#f08080",
+	{% else %}
+	shape=oval,
+	fillcolor="#32b835",
+	{% endif %}
+];
+{%- endmacro -%}
+
+graph "Network" {
+	label="{{ time }}";
+
+{% for router in routers -%}
+	{{ router_macro(router) }}
+{% endfor -%}
+
+{% for link in links -%}
+	{{ link_macro(link.src_rtr, link.dst_rtr, link.network) }}
+{% endfor -%}
+
+
+}

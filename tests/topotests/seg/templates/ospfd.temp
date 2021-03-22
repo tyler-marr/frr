@@ -1,0 +1,31 @@
+{% macro network(network) -%}
+  network 10.0.{{ network }}.0/24 area 0.0.0.0
+{%- endmacro -%}
+!
+router ospf
+  ospf router-id 10.0.255.{{ rtr_n }}
+  capability opaque
+  opaque-lsa
+  router-info area 0.0.0.0
+  segment-routing on
+  segment-routing node-msd 16
+  segment-routing global-block 16000 23999
+  segment-routing local-block 5000 15999
+  segment-routing prefix 10.0.255.{{ rtr_n }}/32 index {{ gsrl }}
+!
+interface lo
+  ip ospf area 0.0.0.0
+!
+{% macro interface(dev_n) -%}
+int r{{ rtr_n }}-eth{{ dev_n }}
+  ip ospf network point-to-point
+  ip ospf hello-interval 2
+  ip ospf dead-interval 10
+  ip ospf area 0.0.0.0
+!
+{%- endmacro -%}
+{% for intf in interfaces -%}
+  {{ interface(intf.dev_n) }}
+{% endfor -%}
+
+
