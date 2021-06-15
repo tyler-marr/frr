@@ -1,31 +1,39 @@
-{% macro link_macro(src_rtr, dst_rtr, network) -%}
-  {{ src_rtr }} -- {{ dst_rtr }} [label="{{ network }}"];
+{% macro link_macro(src_rtr, dst_rtr, network) %}
+  "{{ src_rtr }}" -- "{{ dst_rtr }}" [label="{{ network }}"];
 {%- endmacro -%}
 
-{% macro router_macro(rtr) -%}
+{% macro router_macro(rtr) %}
 {{ rtr.name }} [
 	label="{{ rtr.name }}",
 	style=filled,
-	{% if rtr.isRouter == 1 %}
+	{% if rtr.isRouter == 1 -%}
 	shape=doubleoctagon,
 	fillcolor="#f08080",
-	{% else %}
+	{% else -%}
 	shape=oval,
 	fillcolor="#32b835",
 	{% endif %}
 ];
-{%- endmacro -%}
+{% endmacro %}
 
 graph "Network" {
 	label="{{ time }}";
 
-{% for router in routers -%}
+{%- for router in routers -%}
 	{{ router_macro(router) }}
-{% endfor -%}
+{%- endfor -%}
 
-{% for link in links -%}
-	{{ link_macro(link.src_rtr, link.dst_rtr, link.network) }}
-{% endfor -%}
+#break between routers and links
+
+{% for link in links %}
+	{%- if links[link].type == "point-to-point" -%}
+		{{ link_macro(links[link].routers[0], links[link].routers[1], "."+ links[link].network_id|string) }}
+	{%- else -%}
+		{%- for router in links[link].routers -%}
+			{{ link_macro(router, links[link].network_id, "") }}
+		{%- endfor -%}
+	{%- endif -%}
+{% endfor %}
 
 
 }

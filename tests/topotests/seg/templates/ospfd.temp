@@ -5,27 +5,27 @@
 router ospf
   ospf router-id 10.0.255.{{ rtr_n }}
   capability opaque
-  opaque-lsa
   router-info area 0.0.0.0
   segment-routing on
   segment-routing node-msd 16
   segment-routing global-block 16000 23999
   segment-routing local-block 5000 15999
-  segment-routing prefix 10.0.255.{{ rtr_n }}/32 index {{ gsrl }}
+  segment-routing prefix 10.0.255.{{ rtr_n }}/32 index {{ gsrl }} explicit-null
 !
 interface lo
   ip ospf area 0.0.0.0
 !
-{% macro interface(dev_n) -%}
-int r{{ rtr_n }}-eth{{ dev_n }}
-  ip ospf network point-to-point
+{% macro interface(dev_n, network) -%}
+interface r{{ rtr_n }}-eth{{ dev_n }}
+
+  ip ospf network {{ network.type }}
   ip ospf hello-interval 2
   ip ospf dead-interval 10
   ip ospf area 0.0.0.0
 !
 {%- endmacro -%}
 {% for intf in interfaces -%}
-  {{ interface(intf.dev_n) }}
+  {{ interface(intf.dev_n, intf.network) }}
 {% endfor -%}
 
 

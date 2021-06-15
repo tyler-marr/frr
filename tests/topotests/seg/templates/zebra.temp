@@ -1,6 +1,6 @@
 {% macro interface(dev_n, network, subnet) -%}
 interface {{ name }}-eth{{ dev_n }}
- ip address 10.0.{{ network }}.{{ subnet }}/24
+ ip address 10.0.{{ network.id }}.{{ subnet }}/24
 !
 {%- endmacro -%}
 !
