@@ -156,7 +156,7 @@ class SegTopo(Topo):
     networkCount = 0        # used to number next network
 
     
-
+    # create the config files to achive the desired topology configuration
     def produceRouterConfig(self, data, zebraTemplate, ospfdTemplate):
 
         for router in data["routers"]:
@@ -167,10 +167,8 @@ class SegTopo(Topo):
                 interface["network"] = {
                     "id":interface["network"],
                     "type":network_dict[interface["network"]]["type"],
+
                 }
-                
-
-
 
             j2_zebra = Template(zebraTemplate, undefined=StrictUndefined)
             zebraConf = j2_zebra.render(router)
@@ -217,23 +215,27 @@ class SegTopo(Topo):
     #         with open(file, 'w') as filetowrite:
     #             filetowrite.write(zebraConf)
 
+    # draw network topology as a graph and save as .jpg for easier
+    # to visulize debugging 
     def produceGraph(self, data, dotTemplate):
 
         j2_dot = Template(dotTemplate, undefined=StrictUndefined)
         data["time"] = datetime.now().strftime("%c")
         dotFile = j2_dot.render(data)
-        print(dotFile)
+        
+        with open('config/dotFile.dot', 'w') as filetowrite:
+            filetowrite.write(dotFile)
+
         # run dot with bash here
-        subprocess.call(
-            "echo '{}' | sfdp -T jpg -o graph.jpg".format(dotFile),
+        subprocess.call("sfdp -T jpg -o graph.jpg config/dotFile.dot",
             shell=True
         )
-        for link in data["links"]:
-            print(link)
-            print("{}".format(data["links"][link]))
+        # for link in data["links"]:
+        #     print(link)
+        #     print("{}".format(data["links"][link]))
 
 
-
+    # connect the list of routers all to the same switch
     def connect_via_switch(self, router_list):
         tgen = get_topogen(self)
         self.networkCount = self.networkCount  + 1
@@ -245,6 +247,7 @@ class SegTopo(Topo):
             "routers":router_list,
             "network_id":self.networkCount,
             "type":"broadcast",
+            "draw_sw": True,
             }
 
         subnet = 1
@@ -273,6 +276,7 @@ class SegTopo(Topo):
                     network_dict[self.networkCount]["type"],
                     ))
 
+    # directly connect two routers
     def ptp_connect(self, r1, r2):
         tgen = get_topogen(self)
 
@@ -282,6 +286,7 @@ class SegTopo(Topo):
             "routers":[r1,r2],
             "network_id":self.networkCount,
             "type":"point-to-point",
+            "draw_sw": False,
             }
 
         numLinks = len(tgen.gears[r1].links)
@@ -306,7 +311,8 @@ class SegTopo(Topo):
                     network_dict[self.networkCount]["type"],
                     ))
 
-
+    # directly connect a host (router with no deamons) to a router
+    # this is usually where an Amplet will run from
     def attach_host(self, rtr, host):
         tgen = get_topogen(self)
 
@@ -316,6 +322,7 @@ class SegTopo(Topo):
             "routers":[rtr, host],
             "network_id":self.networkCount,
             "type":"broadcast",
+            "draw_sw": False,
             }
 
         tgen.add_router(host)
@@ -346,6 +353,7 @@ class SegTopo(Topo):
         "Build function"
         tgen = get_topogen(self)
 
+        # create 12 routers
         for routern in range(1, 13):
             tgen.add_router("r{}".format(routern))
 
@@ -390,11 +398,10 @@ class SegTopo(Topo):
         ospfdTemplate = Path('templates/ospfd.temp').read_text()
         dotTemplate = Path('templates/dot.temp').read_text()
 
-        # For all registred routers, load the zebra configuration file
+        # create the internal representation for making the config files
         for rname, router in tgen.routers().items():
             router_dict = Router(get_topogen(self).gears[rname]).toDict()
             routers_list.append(router_dict)
-
 
         data = {
             "hosts":hosts_list,
@@ -405,6 +412,7 @@ class SegTopo(Topo):
         self.produceRouterConfig(data, zebraTemplate, ospfdTemplate)
 
         self.produceGraph(data, dotTemplate)
+
         print("Finished producing graph for topology")
 
 

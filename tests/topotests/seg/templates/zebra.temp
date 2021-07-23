@@ -9,7 +9,7 @@ interface lo
  ip address 10.0.255.{{ rtr_n }}/32
 !
 {% else %}
-ip route 0.0.0.0/0  10.0.{{interfaces[0].network}}.{{3-interfaces[0].subnet}}
+ip route 0.0.0.0/0  10.0.{{interfaces[0].network.id}}.{{3-interfaces[0].subnet}}
 {% endif %}
 {% for intf in interfaces -%}
   {{ interface(intf.dev_n, intf.network, intf.subnet) }}

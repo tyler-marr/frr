@@ -119,3 +119,4 @@ share/doc/frr/examples/*.sample
 tests/topotests/seg/*.jpg
 tests/topotests/seg/*.json
 tests/topotests/seg/config/*
+tests/topotests/seg/post.dot

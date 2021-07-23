@@ -1,0 +1,32 @@
+{% macro link_macro(src_rtr, dst_rtr, network) %}
+  "{{ src_rtr }}" -- "{{ dst_rtr }}" [label="{{ network }}"];
+{%- endmacro -%}
+
+{% macro router_macro(rtr) %}
+"{{ rtr }}" [
+	label="{{ rtr }}",
+	style=filled,
+	shape=oval,
+	fillcolor="#32b835",
+];
+{% endmacro %}
+
+digraph "Network" {
+	label="{{ time }}";
+
+{%- for node in nodes -%}
+	{{ router_macro(node) }}
+{%- endfor -%}
+
+rank = same; {%- for node in nodes -%} "{{ node }}"; {%- endfor -%}
+
+
+#break between routers and links
+
+{% for link in links %}
+	{{ link }}
+{% endfor %}
+
+
+
+}

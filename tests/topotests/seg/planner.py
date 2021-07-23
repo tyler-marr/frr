@@ -13,15 +13,143 @@ topology = {
     "networks":{},
 }
 
+# https://datatracker.ietf.org/doc/html/rfc7752
 bgp_ls_db = {
     "nodes":{},
     "links":{},
     "prefixes":{},
 }
+#example of node and link
+node = {
+    "rtr_ID" : {
+        'OSPF_area': '0.0.0.0',
+        'links': ['rtr_ID-rtr_ID'], #list of all node adjanencys
+        'rtr_ID': '10.0.255.1',
+    },
+}
+link = {
+    'rtr_ID-rtr_ID': {
+        'Adjacency SID': 'local SR-label for link',
+        'localRouter': 'src_rtr_ID',
+        'neighborRouterId': 'dst_rtr_ID',
+        'routerLocalAddress': 'src_ip',
+        'routerNeighborAddress': 'dst_ip',
+    },
+}
+
+prefixe = {
+    "IPaddress/mask" : {}
+}
+
+
+link_format_string = '"{}" -> "{}";'
 
 
 
-## Network OSPF json data
+
+
+
+
+## router OSPF json data
+# ospf-router.json
+with open(sys.argv[4]) as router_json:
+    router_data = json.load(router_json)
+
+
+for area in router_data["routerLinkStates"]["areas"]:
+    for router in router_data["routerLinkStates"]["areas"][area]:
+
+        bgp_ls_db["nodes"][router["linkStateId"]] = {
+            "rtr_ID":router["linkStateId"],
+            "OSPF_area":area,
+            "links":[]
+        }
+
+        for link in router["routerLinks"]:
+            if router["routerLinks"][link]["linkType"] == "another Router (point-to-point)":
+                # print(router["routerLinks"][link])
+
+                # links name from local and remote
+                link_id_l = link_format_string.format(router["linkStateId"], router["routerLinks"][link]["neighborRouterId"])
+                link_id_r = link_format_string.format(router["routerLinks"][link]["neighborRouterId"], router["linkStateId"])
+
+                # if this link from local exists before, its because it was defined as a remote
+                # therefore we know the remotes interface address
+                if link_id_l not in bgp_ls_db["links"].keys():
+                    # print("adding new local {}".format(link_id_l))
+                    bgp_ls_db["links"][link_id_l] = {}
+                    bgp_ls_db["links"][link_id_l]["routerNeighborAddress"] = "GARBAGE"
+                # else:
+                #     print("referencing old local {}".format(link_id_l))
+                
+                bgp_ls_db["links"][link_id_l]["localRouter"] = router["linkStateId"]
+                bgp_ls_db["links"][link_id_l]["neighborRouterId"] = router["routerLinks"][link]["neighborRouterId"]
+                bgp_ls_db["links"][link_id_l]["routerLocalAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
+                bgp_ls_db["links"][link_id_l]["Adjacency SID"] = "UNKNOWN"
+                bgp_ls_db["links"][link_id_l]["defined from"] = "Point-to-point"
+
+                if link_id_r not in bgp_ls_db["links"].keys():
+                    # print("adding new remote {}".format(link_id_r))
+                    bgp_ls_db["links"][link_id_r] = {}
+                # else:
+                #     print("referencing old remote {}".format(link_id_r))
+
+                bgp_ls_db["links"][link_id_r]["routerNeighborAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
+                    
+                
+                # not sure if should be listed as remote name or combined name
+                bgp_ls_db["nodes"][router["linkStateId"]]["links"].append(link_id_l)
+            elif router["routerLinks"][link]["linkType"] == "a Transit Network":
+                print("B {}".format(router["routerLinks"][link]))
+
+                link_id_l = link_format_string.format(router["linkStateId"], router["routerLinks"][link]["designatedRouterAddress"])
+                link_id_r = link_format_string.format(router["routerLinks"][link]["designatedRouterAddress"], router["linkStateId"])
+
+                # if this link from local exists before, its because it was defined as a remote
+                # therefore we know the remotes interface address
+                if link_id_l not in bgp_ls_db["links"].keys():
+                    # print("adding new local {}".format(link_id_l))
+                    bgp_ls_db["links"][link_id_l] = {}
+                    bgp_ls_db["links"][link_id_l]["routerNeighborAddress"] = "GARBAGE"
+                # else:
+                #     print("referencing old local {}".format(link_id_l))
+
+                bgp_ls_db["links"][link_id_l]["localRouter"] = router["linkStateId"]
+                bgp_ls_db["links"][link_id_l]["neighborRouterId"] = router["routerLinks"][link]["designatedRouterAddress"]
+                bgp_ls_db["links"][link_id_l]["routerLocalAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
+                bgp_ls_db["links"][link_id_l]["Adjacency SID"] = "UNKNOWN"
+                bgp_ls_db["links"][link_id_l]["defined from"] = "Transit Network"
+
+
+                # if link_id_r not in bgp_ls_db["links"].keys():
+                #     # print("adding new remote {}".format(link_id_r))
+                # bgp_ls_db["links"][link_id_r] = {}
+                # # else:
+                # #     print("referencing old remote {}".format(link_id_r))
+
+                # bgp_ls_db["links"][link_id_r]["routerNeighborAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
+
+
+                # bgp_ls_db["links"][link_id_l]["routerLocalAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
+
+                # routerInterfaceAddress
+            elif router["routerLinks"][link]["linkType"] == "Stub Network":
+                if router["routerLinks"][link]["networkMask"] == "255.255.255.255":
+                     link_id_l = link_format_string.format(router["linkStateId"], router["routerLinks"][link]["networkAddress"]+"/32")
+                else: 
+                    link_id_l = link_format_string.format(router["linkStateId"], router["routerLinks"][link]["networkAddress"])
+                    bgp_ls_db["links"][link_id_l] = {}
+                    bgp_ls_db["links"][link_id_l]["defined from"] = "Stub Network"
+                    
+            else:
+                print("A {}, : {}".format(
+                        router["routerLinks"][link]["linkType"],
+                        router["linkStateId"]
+                        )
+                    )
+
+# Network OSPF json data
+#ospf-network.json
 with open(sys.argv[3]) as network_json:
     network_data = json.load(network_json)
 
@@ -41,101 +169,66 @@ for area in network_data["networkLinkStates"]["areas"]:
        
 
         for i,link_a in enumerate(sorted(entry["attchedRouters"].keys())):
-            for j, link_b in enumerate( sorted(entry["attchedRouters"].keys()) ):
-                if (i != j):
-                    link_id  = "{}-{}".format(link_a, link_b)
-                    bgp_ls_db["links"][link_id] = {}
-                    bgp_ls_db["links"][link_id]["localRouter"] = link_a
-                    bgp_ls_db["links"][link_id]["neighborRouterId"] = link_b
-                    bgp_ls_db["links"][link_id]["routerLocalAddress"] = "UNKNOWN"
-                    bgp_ls_db["links"][link_id]["Adjacency SID"] = "UNKNOWN"
-                    bgp_ls_db["links"][link_id]["routerNeighborAddress"] = "UNKNOWN"
+            # for j, link_b in enumerate( sorted(entry["attchedRouters"].keys()) ):
+            #     if (i != j):
+            link_id  = link_format_string.format(entry["linkStateId"], link_a)
+
+            bgp_ls_db["links"][link_id] = {}
+            bgp_ls_db["links"][link_id]["localRouter"] = entry["linkStateId"]
+            bgp_ls_db["links"][link_id]["neighborRouterId"] = link_a
+            bgp_ls_db["links"][link_id]["routerLocalAddress"] = "UNKNOWN"
+            bgp_ls_db["links"][link_id]["Adjacency SID"] = "UNKNOWN"
+            bgp_ls_db["links"][link_id]["routerNeighborAddress"] = "UNKNOWN"
 
 
 
+# SR json data
+with open(sys.argv[1]) as sr_json:
+    SR_data = json.load(sr_json)
 
-# dotTemplate = Path('templates/dot.temp').read_text()
-# j2_dot = Template(dotTemplate, undefined=StrictUndefined)
-# topology["time"] = datetime.now().strftime("%c")
-# dotFile = j2_dot.render(topology)
-# # run dot with bash here
-# subprocess.call(
-#     "echo '{}' | sfdp -T jpg -o graph2.jpg".format(dotFile),
-#     shell=True
-# )
+print("Advertising node: {}".format(SR_data["srdbID"]))
+for node in SR_data["srNodes"]:
+    SRGB_START = node["srgbLabel"]
+    print(node["routerID"])
+    # print (topology["routers"][node["routerID"]]["Transits"])
+    # print(node)
+    for entry in node["extendedPrefix"]:
+        print("\tGLOBAL: {1}:{0}".format(entry['prefix'], entry['sid']+SRGB_START))
+    for entry in node["extendedLink"]:
+        print("\tLOCAL:  {1}:{0}".format(entry['prefix'], entry['sid']))
 
-## router OSPF json data
-with open(sys.argv[4]) as router_json:
-    router_data = json.load(router_json)
+        remote_interface_address = str(ipaddress.ip_interface(entry['prefix']).ip)
 
-
-for area in router_data["routerLinkStates"]["areas"]:
-    for router in router_data["routerLinkStates"]["areas"][area]:
-
-        bgp_ls_db["nodes"][router["linkStateId"]] = {
-            "rtr_ID":router["linkStateId"],
-            "OSPF_area":area,
-            "links":[]
-        }
-
-        for link in router["routerLinks"]:
-            if router["routerLinks"][link]["linkType"] == "another Router (point-to-point)":
-                # print(router["routerLinks"][link])
-
-                # links name from local and remote
-                link_id_l = "{}-{}".format(router["linkStateId"], router["routerLinks"][link]["neighborRouterId"])
-                link_id_r = "{}-{}".format(router["routerLinks"][link]["neighborRouterId"], router["linkStateId"])
-
-                # if this link from local exists before, its because it was defined as a remote
-                # therefore we know the remotes interface address
-                if link_id_l not in bgp_ls_db["links"].keys():
-                    # print("adding new local {}".format(link_id_l))
-                    bgp_ls_db["links"][link_id_l] = {}
-                    bgp_ls_db["links"][link_id_l]["routerNeighborAddress"] = "GARBAGE"
-                # else:
-                #     print("referencing old local {}".format(link_id_l))
-                
-                bgp_ls_db["links"][link_id_l]["localRouter"] = router["linkStateId"]
-                bgp_ls_db["links"][link_id_l]["neighborRouterId"] = router["routerLinks"][link]["neighborRouterId"]
-                bgp_ls_db["links"][link_id_l]["routerLocalAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
-                bgp_ls_db["links"][link_id_l]["Adjacency SID"] = "UNKNOWN"
-
-                if link_id_r not in bgp_ls_db["links"].keys():
-                    # print("adding new remote {}".format(link_id_r))
-                    bgp_ls_db["links"][link_id_r] = {}
-                # else:
-                #     print("referencing old remote {}".format(link_id_r))
-
-                bgp_ls_db["links"][link_id_r]["routerNeighborAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
-                    
-                
-                # not sure if should be listed as remote name or combined name
-                bgp_ls_db["nodes"][router["linkStateId"]]["links"].append(link_id_l)
-            elif router["routerLinks"][link]["linkType"] == "a Transit Network":
-                print(router["routerLinks"][link])
-                # bgp_ls_db["links"][link_id_l]["routerLocalAddress"] = router["routerLinks"][link]["routerInterfaceAddress"]
-
-                # routerInterfaceAddress
+    # bgp_ls_db["nodes"][node["routerID"]]["links"] = entry['sid']
 
 
 
-## SR json data
-# with open(sys.argv[1]) as sr_json:
-#     SR_data = json.load(sr_json)
+    link_id_l = link_format_string.format(node["routerID"], entry['prefix'])
+    print(bgp_ls_db["links"])
+    bgp_ls_db["links"][link_id_l]["Adjacency SID"] = entry['sid']
 
-# print("Advertising node: {}".format(SR_data["srdbID"]))
-# for node in SR_data["srNodes"]:
-#     SRGB_START = node["srgbLabel"]
-#     print(node["routerID"])
-#     # print (topology["routers"][node["routerID"]]["Transits"])
-#     # print(node)
-#     for entry in node["extendedPrefix"]:
-#         print("\tGLOBAL: {1}:{0}".format(entry['prefix'], entry['sid']+SRGB_START))
-#     for entry in node["extendedLink"]:
-#         print("\tLOCAL:  {1}:{0}".format(entry['prefix'], entry['sid']))
 
-#         remote_interface_address = str(ipaddress.ip_interface(entry['prefix']).ip)
-#         # topology["routers"][node["routerID"]]["Transits"][remote_interface_address]["label"] = entry['sid']
+
+    # print (bgp_ls_db["nodes"][node["routerID"]])
+
+
+
+dotTemplate = Path('templates/bgpls.dot').read_text()
+j2_dot = Template(dotTemplate, undefined=StrictUndefined)
+bgp_ls_db["time"] = datetime.now().strftime("%c")
+dotFile = j2_dot.render(bgp_ls_db)
+
+file='post.dot'
+with open(file, 'w') as filetowrite:
+    filetowrite.write(dotFile)
+
+
+# run dot with bash here
+subprocess.call(
+    "echo '{}' | sfdp -T jpg -o graph2.jpg".format(dotFile),
+    shell=True
+)
+
 
 
 # # print router information
@@ -201,13 +294,18 @@ for area in router_data["routerLinkStates"]["areas"]:
 #         ))
 
 
-print("Links:")
-for link  in sorted(bgp_ls_db["links"].keys()):
-    print("\t{}\n\t\t{}|{} --> {}|{}\n\t\tSID:{}".format(
-        link,
-        bgp_ls_db["links"][link]["localRouter"],
-        bgp_ls_db["links"][link]["routerLocalAddress"],
-        bgp_ls_db["links"][link]["routerNeighborAddress"],
-        bgp_ls_db["links"][link]["neighborRouterId"],
-        bgp_ls_db["links"][link]["Adjacency SID"],
-        ))
+# print("Links:")
+# for link  in sorted(bgp_ls_db["links"].keys()):
+#     print("\t{}\n\t\t{}|{} --> {}|{}\n\t\tSID:{}".format(
+#         link,
+#         bgp_ls_db["links"][link]["localRouter"],
+#         bgp_ls_db["links"][link]["routerLocalAddress"],
+#         bgp_ls_db["links"][link]["routerNeighborAddress"],
+#         bgp_ls_db["links"][link]["neighborRouterId"],
+#         bgp_ls_db["links"][link]["Adjacency SID"],
+#         ))
+
+
+print ()
+pp = pprint.PrettyPrinter(indent=1)
+pp.pprint(bgp_ls_db)

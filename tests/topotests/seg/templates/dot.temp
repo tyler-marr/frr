@@ -26,7 +26,7 @@ graph "Network" {
 #break between routers and links
 
 {% for link in links %}
-	{%- if links[link].type == "point-to-point" -%}
+	{%- if links[link].draw_sw == False -%}
 		{{ link_macro(links[link].routers[0], links[link].routers[1], "."+ links[link].network_id|string) }}
 	{%- else -%}
 		{%- for router in links[link].routers -%}
